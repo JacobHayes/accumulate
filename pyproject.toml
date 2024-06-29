@@ -1,14 +1,65 @@
-[tool.poetry]
-authors = ["Jacob Hayes <jacob.r.hayes@gmail.com>"]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+
+[project]
+name = "accumulate"
+authors = [{ name = "Jacob Hayes", email = "jacob.r.hayes@gmail.com" }]
+dependencies = []
 description = "Inheritance for iterable attributes."
 license = "MIT"
-name = "accumulate"
 readme = "README.md"
-repository = "https://github.com/JacobHayes/pymiscuous/tree/master/accumulate"
+requires-python = ">=3.12,<4"
 version = "1.0.0"
 
-[tool.poetry.dependencies]
-python = "^3"
+[project.urls]
+Repository = "https://github.com/JacobHayes/pymiscuous/tree/master/accumulate"
 
-[tool.poetry.dev-dependencies]
-pytest = "^3.0"
+
+[tool.hatch.build]
+packages = ["src/accumulate"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+
+[tool.pyright]
+typeCheckingMode = "strict"
+
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules --import-mode=importlib"
+filterwarnings = ["error"]
+testpaths = ["src/", "tests/"]
+xfail_strict = true
+
+
+[tool.rye]
+managed = true
+dev-dependencies = ["pyright", "pytest"]
+
+
+[tool.ruff]
+fix = true
+src = ["src/", "tests/"]
+target-version = "py312"
+
+[tool.ruff.lint]
+extend-select = [
+  "I",   # isort
+  "ISC", # disable implicit str concat
+  "PGH", # pygrep-hooks
+  "PT",  # standardize pytest usage
+  "RET", # standardize return (or not)
+  "RUF", # misc ruff checks
+  "SIM", # simplify code when possible
+  "UP",  # pyupgrade
+  "W",   # pycodestyle warnings
+]
+flake8-implicit-str-concat = { allow-multiline = false }
+ignore = [
+  "E501", # line too long (covered by ruff format)
+  "S101", # Use of assert (used for type narrowing)
+]
+pyupgrade = { keep-runtime-typing = true } # Preserve types, even if a file imports `from __future__ import annotations`.
