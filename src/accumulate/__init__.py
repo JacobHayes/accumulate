@@ -3,7 +3,9 @@
 from collections.abc import Iterable, Mapping
 from functools import partial
 from itertools import chain
+from typing import Literal
 
+type Order = Literal["parent-first", "parent-last"]
 
 
 class accumulate[T]:
@@ -16,6 +18,11 @@ class accumulate[T]:
     Supports Mapping types (including defaultdict) Top level key collisions prefer the
     child-most value. If the mapping is ordered, the result will be ordered, but note
     that collisions will maintain the original position.
+
+    The `order` parameter determines how the final output iterable will be created.
+    - `parent-first`: `["base", "sub"]`; `{"base": 1, "sub": 2, "shared": "sub"}`
+    - `parent-last`: `["sub", "base"]`; `{"base": 1, "sub": 2, "shared": "base"}`
+    Note that for mappings, `parent-last` will prefer the parent key over the child key.
 
     >>> class Base:
     ...     fields = ["id"]
@@ -31,7 +38,7 @@ class accumulate[T]:
     ...     )
     ...
     >>> User.fields
-    ['name', 'password', 'id']
+    ['id', 'name', 'password']
     >>> User.metadata
     {'read_only_field': ('id',), 'filter_fields': ('name',), 'hidden_fields': ('password',)}
 
@@ -39,13 +46,14 @@ class accumulate[T]:
     but any nested iterables are replaced.
     """
 
-    def __init__(self, values: T):
+    def __init__(self, values: T, *, order: Order = "parent-first"):
         self.constructor = type(values)
         # Support constructors with factories, such as defaultdict
         if hasattr(values, "default_factory"):
             self.constructor = partial(self.constructor, values.default_factory)  # pyright: ignore[reportAttributeAccessIssue,reportUnknownMemberType]
         self.is_mapping = isinstance(values, Mapping)
         self.name: str | None = None
+        self.order: Order = order  # Pyright infers `: str` without an explicit hint
         self.values = values
         # NOTE: We're checking last to avoid type narrowing, which would confuse pyright on subsequent access.
         if not isinstance(values, Iterable):
@@ -61,14 +69,18 @@ class accumulate[T]:
         collection = tuple(
             iterable
             for iterable in chain(
-                [self.values],
                 (getattr(base, name, None) for base in type_.__bases__),
+                [self.values],
             )
             if iterable
         )
+        match self.order:
+            case "parent-first":
+                pass
+            case "parent-last":
+                collection = reversed(collection)
         if self.is_mapping:
-            # Reverse the order of mappings to be parent->leaf to prefer leaf values
-            collection = (d.items() for d in reversed(tuple(collection)))
+            collection = (d.items() for d in tuple(collection))
         return self.constructor(chain.from_iterable(collection))  # pyright: ignore[reportCallIssue]
 
     def __set__(self, obj: object, values: T) -> None:

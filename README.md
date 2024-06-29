@@ -23,7 +23,7 @@ class User(Base):
         }
     )
 
-assert User.fields == ["name", "password", "id"]
+assert User.fields == ["id", "name", "password"]
 assert User.metadata == {
     "filter_fields": ("name",),
     "hidden_fields": ("password",),
