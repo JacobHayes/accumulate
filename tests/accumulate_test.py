@@ -1,69 +1,102 @@
 from collections import defaultdict
+from typing import ClassVar, cast
 
 import pytest
 
 from accumulate import accumulate
 
 
-def gen_classes(attr, *values):
-    """ Generate the chain of classes with `attr` set to the successive values in `values` and return the last one.
-    """
-    base = object
-    for value in values:
+def test_accumulate():
+    class A:
+        x: ClassVar = [1]  # You can start with a plain container
+        y = accumulate({"a": 1})  # Or an accumulating one
 
-        class Class(base):
-            pass
+    assert A.x == A().x == [1]
+    assert A.y == A().y == {"a": 1}
 
-        setattr(Class, attr, value)
-        base = Class
-    return Class, attr
+    class B(A):
+        x = accumulate([2])  # And build up along the way
+        y = accumulate({"b": 2})
+
+    assert B.x == B().x == [2, 1]
+    assert B.y == B().y == {"a": 1, "b": 2}
+
+    class C(B):
+        x: ClassVar = [3]  # Or, override the accumulation with a single value
+
+    assert C.x == C().x == [3]
+    assert C.y == C().y == {"a": 1, "b": 2}
+
+    class D(C):
+        x = accumulate([4])  # If you accumulate again, it'll be limited
+
+    assert D.x == D().x == [4, 3]
+    assert D.y == D().y == {"a": 1, "b": 2}
+
+
+def test_accumulate_override():
+    class A:
+        x = accumulate([1])
+
+    class B(A):
+        x = accumulate([2])
+
+    # You can also override on an instance without affecting the class values.
+    override = B()
+    override.x = [-1]
+    assert B.x == [2, 1]
+    assert override.x == [-1]
 
 
 @pytest.mark.parametrize(
-    "msg,call,expected",
-    (
+    ("msg", "chain_values", "expected"),
+    [
         (
-            "it should handle non-accumulating bases",
-            lambda sut: gen_classes("x", [1], sut([2])),
-            [2, 1],
+            "it should handle lists",
+            [[1], [2], [3]],
+            [3, 2, 1],
         ),
         (
-            "it should handle multiple accumulations",
-            lambda sut: gen_classes("x", sut([1]), sut([2])),
-            [2, 1],
+            "it should handle tuples",
+            [(1,), (2,), (3,)],
+            (3, 2, 1),
         ),
         (
             "it should handle sets",
-            lambda sut: gen_classes("x", sut({1}), sut({2}), sut({2})),
+            [{1}, {2}, {2}],
             {1, 2},
         ),
         (
             "it should handle dicts",
-            lambda sut: gen_classes("x", sut({1: 1}), sut({2: 2}), sut({1: 3})),
-            {1: 3, 2: 2},
+            [{"a": 1}, {"b": 2}, {"b": -2}],
+            {"a": 1, "b": -2},
         ),
         (
             "it should handle defaultdicts",
-            lambda sut: gen_classes(
-                "x",
-                sut(defaultdict(dict, {1: 1})),
-                sut(defaultdict(dict, {2: 2})),
-                sut(defaultdict(dict, {1: 3})),
-            ),
-            {1: 3, 2: 2},
+            [
+                defaultdict(int, a=1),
+                defaultdict(int, b=2),
+                defaultdict(int, b=-2),
+            ],
+            {"a": 1, "b": -2},
         ),
-    ),
+    ],
 )
-def test_accumulate(msg, call, expected):
-    cls, attr = call(accumulate)
-    assert getattr(cls, attr) == expected, msg
+def test_accumulate_types[T](msg: str, chain_values: list[T], expected: T) -> None:
+    output = gen_classes(*chain_values)
+    assert output == expected, msg
 
 
-def test_accumulate_instance_override():
-    class Test:
-        x = accumulate([1, 2])
+def gen_classes[T](value: T, *values: T) -> T:
+    """Generate the chain of classes with `attr` set to the successive values in `values` and return the last one."""
 
-    test = Test()
-    test.x = 1
-    assert Test.x == [1, 2]
-    assert test.x == 1
+    class Foo:
+        x = accumulate(value)
+
+    for value in values:
+
+        class Sub(Foo):
+            x = accumulate(value)
+
+        Foo = cast(type[Foo], Sub)
+    return Foo.x

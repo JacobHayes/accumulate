@@ -1,94 +1,96 @@
-""" Contains helpers to accumulate iterable class attributes.
-"""
-from collections.abc import Mapping
+"""Contains helpers to accumulate iterable class attributes."""
+
+from collections.abc import Iterable, Mapping
 from functools import partial
 from itertools import chain
 
 
-class Accumulate:
-    """ Inherit iterable class attributes, accumulating values along the way.
 
-        Implements a descriptor over iterable types that chains the current and parent
-        class values together. Values are only retrieved from immediate parents, but
-        Accumulate can be used repeatedly at multiple inheritance levels to provide deep
-        retrieval.
+class accumulate[T]:
+    """Inherit iterable class attributes, accumulating values along the way.
 
-        Supports Mapping types (including defaultdict) Top level key collisions prefer
-        the child-most value. If the mapping is ordered, the result will be ordered, but
-        note that collisions will maintain the original position.
+    Implements a descriptor over iterable types that chains the current and parent class
+    values together. Values are only retrieved from immediate parents, but `accumulate`
+    can be used repeatedly at multiple inheritance levels to provide deep retrieval.
 
-        Note: These operations can be considered "shallow" - only top level values are
-        accumulated. For mappings, that means Container *values* will be replaced, not
-        merged.
+    Supports Mapping types (including defaultdict) Top level key collisions prefer the
+    child-most value. If the mapping is ordered, the result will be ordered, but note
+    that collisions will maintain the original position.
 
-        >>> class Base:
-        ...     fields = ("id",)
-        ...     metadata = {"filter_fields": ("id",), "read_only_field": ("id",)}
-        ...
-        >>> class User(Base):
-        ...     fields = accumulate(("name", "password"))
-        ...     metadata = accumulate({
-        ...         "filter_fields": ("name",),
-        ...         "invisible_fields": ("password",)
-        ...     })
-        ...
-        >>> User.fields
-        ('name', 'password', 'id')
-        >>> User.metadata
-        {'filter_fields': ('name',), 'read_only_field': ('id',), 'invisible_fields': ('password',)}
+    >>> class Base:
+    ...     fields = ["id"]
+    ...     metadata = {"read_only_field": ("id",)}
+    ...
+    >>> class User(Base):
+    ...     fields = accumulate(["name", "password"])
+    ...     metadata = accumulate(
+    ...         {
+    ...             "filter_fields": ("name",),
+    ...             "hidden_fields": ("password",),
+    ...         }
+    ...     )
+    ...
+    >>> User.fields
+    ['name', 'password', 'id']
+    >>> User.metadata
+    {'read_only_field': ('id',), 'filter_fields': ('name',), 'hidden_fields': ('password',)}
+
+    NOTE: The accumulation is "shallow": the root iterable from each class is merged,
+    but any nested iterables are replaced.
     """
 
-    def __init__(self, values):
+    def __init__(self, values: T):
         self.constructor = type(values)
         # Support constructors with factories, such as defaultdict
         if hasattr(values, "default_factory"):
-            self.constructor = partial(self.constructor, values.default_factory)
+            self.constructor = partial(self.constructor, values.default_factory)  # pyright: ignore[reportAttributeAccessIssue,reportUnknownMemberType]
         self.is_mapping = isinstance(values, Mapping)
-        self.name = None
+        self.name: str | None = None
         self.values = values
+        # NOTE: We're checking last to avoid type narrowing, which would confuse pyright on subsequent access.
+        if not isinstance(values, Iterable):
+            raise TypeError(f"Expected an iterable type, got {type(values)}")
 
-    def __get__(self, obj, type_):
+    def __get__(self, obj: object | None, type_: type | None = None) -> T:
         if type_ is None:
             type_ = type(obj)
-        if self.name is None:
-            self._infer_name(type_)
+        name = self.get_name(type_)
         # Prefer object local values from __set__
-        if obj is not None and self.name in obj.__dict__:
-            return obj.__dict__[self.name]
-        collection = (
+        if obj is not None and name in obj.__dict__:
+            return obj.__dict__[name]
+        collection = tuple(
             iterable
             for iterable in chain(
                 [self.values],
-                (getattr(base, self.name, None) for base in type_.__bases__),
+                (getattr(base, name, None) for base in type_.__bases__),
             )
             if iterable
         )
         if self.is_mapping:
             # Reverse the order of mappings to be parent->leaf to prefer leaf values
             collection = (d.items() for d in reversed(tuple(collection)))
-        return self.constructor(chain.from_iterable(collection))
+        return self.constructor(chain.from_iterable(collection))  # pyright: ignore[reportCallIssue]
 
-    def __set__(self, obj, values):
-        if self.name is None:
-            self._infer_name(type(obj))
-        obj.__dict__[self.name] = values
+    def __set__(self, obj: object, values: T) -> None:
+        name = self.get_name(type(obj))
+        obj.__dict__[name] = values
 
-    def __set_name__(self, type_, name):
-        """ Set the field name during class initialization on py3.6+. See `_infer_name` for cases where this is not
-            called.
+    def __set_name__(self, type_: type, name: str):
+        """Set the field name during class initialization.
+
+        This will not be called if the attribute is set with `setattr`. `_infer_name` will be used instead if needed.
         """
         self.name = name
 
-    def _infer_name(self, type_):
-        """ Infer a field name for py3.5- or when the descriptor is added with setattr (which won't call __set_name__).
-        """
-        all_attributes = chain.from_iterable(dir(cls) for cls in type_.__mro__)
-        attributes = {attr for attr in all_attributes if not attr.startswith("__")}
-        for attr in attributes:
-            if type_.__dict__[attr] is self:
-                self.name = attr
+    def get_name(self, type_: type) -> str:
+        """Infer a field name in case the descriptor is added with setattr, which won't call __set_name__."""
         if self.name is None:
-            raise ValueError("Unable to determine attribute name on {}.".format(type_))
-
-
-accumulate = Accumulate
+            all_attributes = chain.from_iterable(dir(cls) for cls in type_.__mro__)
+            attributes = {attr for attr in all_attributes if not attr.startswith("__")}
+            for attr in attributes:
+                if type_.__dict__[attr] is self:
+                    self.name = attr
+                    break
+            else:
+                raise ValueError(f"Unable to determine attribute name on {type_}.")
+        return self.name
