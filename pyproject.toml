@@ -1,0 +1,14 @@
+[tool.poetry]
+authors = ["Jacob Hayes <jacob.r.hayes@gmail.com>"]
+description = "Inheritance for iterable attributes."
+license = "MIT"
+name = "accumulate"
+readme = "README.md"
+repository = "https://github.com/JacobHayes/pymiscuous/tree/master/accumulate"
+version = "1.0.0"
+
+[tool.poetry.dependencies]
+python = "^3"
+
+[tool.poetry.dev-dependencies]
+pytest = "^3.0"
