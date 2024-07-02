@@ -11,7 +11,7 @@ description = "Inheritance for iterable attributes."
 license = "MIT"
 readme = "README.md"
 requires-python = ">=3.12,<4"
-version = "1.0.0"
+version = "2.0.0"
 
 [project.urls]
 Repository = "https://github.com/JacobHayes/pymiscuous/tree/master/accumulate"
