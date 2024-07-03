@@ -11,13 +11,13 @@ description = "Inheritance for iterable attributes."
 license = "MIT"
 readme = "README.md"
 requires-python = ">=3.12,<4"
-version = "2.0.0"
+version = "2.0.1"
 
 [project.urls]
 Repository = "https://github.com/JacobHayes/pymiscuous/tree/master/accumulate"
 
 
-[tool.hatch.build]
+[tool.hatch.build.targets.sdist]
 packages = ["src/accumulate"]
 
 [tool.hatch.metadata]
