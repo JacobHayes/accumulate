@@ -7,8 +7,11 @@
 #   all-features: false
 #   with-sources: false
 #   generate-hashes: false
+#   universal: true
 
 -e file:.
+colorama==0.4.6 ; sys_platform == 'win32'
+    # via pytest
 iniconfig==2.0.0
     # via pytest
 nodeenv==1.9.1

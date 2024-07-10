@@ -36,8 +36,9 @@ xfail_strict = true
 
 
 [tool.rye]
-managed = true
 dev-dependencies = ["pyright", "pytest"]
+managed = true
+universal = true
 
 
 [tool.ruff]
