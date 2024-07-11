@@ -37,6 +37,7 @@ xfail_strict = true
 
 [tool.rye]
 dev-dependencies = ["pyright", "pytest"]
+generate-hashes = true
 managed = true
 universal = true
 
