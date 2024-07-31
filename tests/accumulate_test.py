@@ -22,16 +22,16 @@ def test_accumulate():
     assert B.y == B().y == {"a": 1, "b": 2}
 
     class C(B):
-        x: ClassVar = [3]  # Or, override the accumulation with a single value
+        y: ClassVar = {"c": 3}  # Or, override the accumulation with a single value
 
-    assert C.x == C().x == [3]
-    assert C.y == C().y == {"a": 1, "b": 2}
+    assert C.x == C().x == [1, 2]
+    assert C.y == C().y == {"c": 3}
 
     class D(C):
-        x = accumulate([4])  # If you accumulate again, it'll be limited
+        y = accumulate({"d": 4})  # If you accumulate again, it'll be limited
 
-    assert D.x == D().x == [3, 4]
-    assert D.y == D().y == {"a": 1, "b": 2}
+    assert D.x == D().x == [1, 2]
+    assert D.y == D().y == {"c": 3, "d": 4}
 
 
 @pytest.mark.parametrize(

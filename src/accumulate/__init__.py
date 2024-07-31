@@ -1,9 +1,9 @@
 """Contains helpers to accumulate iterable class attributes."""
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from functools import partial
 from itertools import chain
-from typing import Literal
+from typing import Any, Literal
 
 type Order = Literal["parent-first", "parent-last"]
 
@@ -66,14 +66,7 @@ class accumulate[T]:
         # Prefer object local values from __set__
         if obj is not None and name in obj.__dict__:
             return obj.__dict__[name]
-        collection = tuple(
-            iterable
-            for iterable in chain(
-                (getattr(base, name, None) for base in type_.__bases__),
-                [self.values],
-            )
-            if iterable
-        )
+        collection = tuple(self.get_values(name, type_))
         match self.order:
             case "parent-first":
                 pass
@@ -106,3 +99,12 @@ class accumulate[T]:
             else:
                 raise ValueError(f"Unable to determine attribute name on {type_}.")
         return self.name
+
+    def get_values(self, name: str, type_: type) -> Iterator[Any]:
+        for base in type_.__bases__:
+            if values := getattr(base, name, None):
+                yield values
+        # Subclasses that don't override this attribute will already have the values
+        # yielded from the base class, so we don't need to yield again.
+        if name in type_.__dict__:
+            yield self.values
